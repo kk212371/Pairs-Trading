@@ -1,1 +1,9 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import coint
 
+tickers = ["0005.HK", "2888.HK"]  # 可替换为你想测的 pair
+data = yf.download(tickers, start="2022-01-01", end="2023-12-31")['Adj Close']
+data.head()
