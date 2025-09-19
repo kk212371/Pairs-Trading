@@ -4,6 +4,67 @@ import numpy as np
 import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import coint
 
-tickers = ["0005.HK", "2888.HK"]  # 可替换为你想测的 pair
+tickers = ["0005.HK", "2888.HK"]
 data = yf.download(tickers, start="2022-01-01", end="2023-12-31")['Adj Close']
 data.head()
+
+data = data.ffill().dropna()
+data.plot(figsize=(10,5), title="Prices")
+plt.show()
+
+spread = data[tickers[0]] - data[tickers[1]]
+spread.head()
+
+mean = spread.mean()
+std = spread.std()
+z_score = (spread - mean) / std
+
+plt.figure(figsize=(10,5))
+plt.plot(z_score, label="z-score")
+plt.axhline(2, color='red', linestyle='--')
+plt.axhline(-2, color='green', linestyle='--')
+plt.axhline(0, color='black', linestyle='-')
+plt.legend(); plt.title("Spread Z-Score")
+plt.show()
+
+score, pvalue, _ = coint(data[tickers[0]], data[tickers[1]])
+print("cointegration p-value:", pvalue)
+
+spread_values = spread.values
+z = z_score.values
+
+position = 0
+pnl = []    # 每日策略收益（proxy）
+positions = []
+
+for i in range(len(z)):
+    if z[i] > 2:
+        position = -1   # 做空 spread: 卖A, 买B
+    elif z[i] < -2:
+        position = 1    # 做多 spread: 买A, 卖B
+    elif abs(z[i]) < 0.5:
+        position = 0    # 平仓
+    positions.append(position)
+    pnl.append(position * ( (spread_values[i] - spread_values[i-1]) if i>0 else 0 ))
+    
+pnl = pd.Series(pnl, index=spread.index)
+cum_pnl = pnl.cumsum()
+
+cum_pnl.plot(figsize=(10,5), title="Cumulative PnL")
+plt.show()
+
+daily_returns = pnl.replace(0, 0)  # 已是每日策略收益 proxy
+mean_daily = daily_returns.mean()
+std_daily = daily_returns.std()
+sharpe = (mean_daily / std_daily) * np.sqrt(252) if std_daily != 0 else np.nan
+print("Approx Sharpe Ratio:", sharpe)
+
+plt.figure(figsize=(10,5))
+plt.plot(z_score)
+plt.savefig("spread_plot.png")
+plt.close()
+
+plt.figure(figsize=(10,5))
+plt.plot(cum_pnl)
+plt.savefig("pnl_plot.png")
+plt.close()
